@@ -14,4 +14,7 @@ export default defineNuxtConfig({
   vite: {
     plugins: [string({ include: '**/*.glsl' })],
   },
+  app: {
+    baseURL: '/'
+  },
 })
