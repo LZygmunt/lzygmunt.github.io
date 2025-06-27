@@ -37,7 +37,7 @@ const NOISE_TEXTURE_SIZE = 128 // Noise texture size
 
 // Rendering and performance
 const FRAME_SKIP_BASE = 7 // Base number of frames to skip
-const DEFAULT_EFFECT_SPEED = 7 // Default effect speed
+const DEFAULT_EFFECT_SPEED = 6 // Default effect speed
 const RESIZE_DEBOUNCE_MS = 100 // Debounce delay for resize (ms)
 
 // Colors and materials
@@ -172,16 +172,16 @@ function init() {
 }
 
 function fillTexture( texture: THREE.DataTexture ) {
-  const waterMaxHeight = 0.1;
+  const waterMaxHeight = WATER_MAX_HEIGHT;
 
   function noise( x: number, y: number ) {
     let multR = waterMaxHeight;
-    let mult = 0.025;
+    let mult = NOISE_MULTIPLIER_BASE;
     let r = 0;
-    for ( let i = 0; i < 15; i ++ ) {
+    for ( let i = 0; i < NOISE_ITERATIONS; i ++ ) {
       r += multR * simplex.noise( x * mult, y * mult );
-      multR *= 0.53 + 0.025 * i;
-      mult *= 1.25;
+      multR *= NOISE_MULTIPLIER_DECAY + NOISE_MULTIPLIER_INCREMENT * i;
+      mult *= NOISE_SCALE_MULTIPLIER
     }
     return r;
   }
@@ -190,8 +190,8 @@ function fillTexture( texture: THREE.DataTexture ) {
   let p = 0;
   for ( let j = 0; j < TEXTURE_WIDTH; j ++ ) {
     for ( let i = 0; i < TEXTURE_WIDTH; i ++ ) {
-      const x = i * 128 / TEXTURE_WIDTH;
-      const y = j * 128 / TEXTURE_WIDTH;
+      const x = i * NOISE_TEXTURE_SIZE / TEXTURE_WIDTH;
+      const y = j * NOISE_TEXTURE_SIZE / TEXTURE_WIDTH;
       pixels[ p + 0 ] = noise( x, y );
       pixels[ p + 1 ] = pixels[ p + 0 ];
       pixels[ p + 2 ] = 0;
@@ -217,20 +217,23 @@ function onPointerMove(event) {
   );
 }
 
+let x,y = x = 0
 function raycast() {
   const uniforms = heightmapVariable.material.uniforms;
-  // if (mousedown) {
+  if (mousedown) {
     raycaster.value.setFromCamera(mouseCoords, camera.value!);
     const intersects = raycaster.value.intersectObject(meshRay.value);
     if (intersects.length > 0) {
       const point = intersects[0].point;
-      uniforms['mousePos'].value.set(Math.random() * BOUNDS.value * 2 - BOUNDS.value, Math.random() * BOUNDS.value * 2- BOUNDS.value);
+      x = mousedown ? point.x : Math.random() * BOUNDS.value * 2 - BOUNDS.value
+      y = mousedown ? point.z : Math.random() * BOUNDS.value * 2 - BOUNDS.value
+      uniforms['mousePos'].value.set(x, y);
     } else {
       uniforms['mousePos'].value.set(MOUSE_OUTSIDE_POSITION, MOUSE_OUTSIDE_POSITION);
     }
-  // } else {
-  //   uniforms['mousePos'].value.set(MOUSE_OUTSIDE_POSITION, MOUSE_OUTSIDE_POSITION);
-  // }
+  } else {
+    uniforms['mousePos'].value.set(MOUSE_OUTSIDE_POSITION, MOUSE_OUTSIDE_POSITION);
+  }
 }
 
 function makeDrop() {
@@ -250,10 +253,10 @@ function handleResize() {
       // Update geometries with new square size
       waterMesh.value.geometry.dispose()
       meshRay.value.geometry.dispose()
-      
+
       waterMesh.value.geometry = new THREE.PlaneGeometry(BOUNDS.value, BOUNDS.value, TEXTURE_WIDTH - 1, TEXTURE_WIDTH - 1)
       meshRay.value.geometry = new THREE.PlaneGeometry(BOUNDS.value, BOUNDS.value, RAYCAST_PLANE_SEGMENTS, RAYCAST_PLANE_SEGMENTS)
-      
+
       // Update BOUNDS in shaders
       if (heightmapVariable) {
         heightmapVariable.material.defines.BOUNDS = BOUNDS.value.toFixed(DECIMAL_PRECISION);
