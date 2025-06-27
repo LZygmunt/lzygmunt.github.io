@@ -3,7 +3,7 @@ import shaderChangeBeginVertex from 'assets/shaders/shaderChangeBeginVertex.glsl
 import shaderChangeBeginNormalVertex from 'assets/shaders/shaderChangeBeginnormalVertex.glsl'
 import shaderChangeCommon from 'assets/shaders/shaderChangeCommon.glsl'
 
-class WaterMaterial extends THREE.MeshStandardMaterial {
+export class WaterMaterial extends THREE.MeshStandardMaterial {
   extra: Record<string, THREE.IUniform | null>
   constructor( parameters:  THREE.MeshStandardMaterialParameters, WIDTH = 128, BOUNDS = 6 ) {
     super();
@@ -50,5 +50,3 @@ class WaterMaterial extends THREE.MeshStandardMaterial {
     this.userData.shader = shader;
   }
 }
-
-export default WaterMaterial;

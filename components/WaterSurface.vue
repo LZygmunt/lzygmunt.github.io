@@ -3,8 +3,8 @@ import * as THREE from 'three'
 import { GPUComputationRenderer } from 'three/addons/misc/GPUComputationRenderer'
 import type { Variable } from 'three/addons/misc/GPUComputationRenderer'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader'
-import WaterMaterial from '~/materials/WaterMaterial'
-import { useTresContext, useLoop, extend, useLoader, type Intersection } from '@tresjs/core'
+import { WaterMaterial } from '~/materials/WaterMaterial'
+import { useTresContext, useLoop } from '@tresjs/core'
 import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
 import smoothFragmentShader from '~/assets/shaders/smoothFragmentShader.glsl'
 import readWaterLevelFragmentShader from '~/assets/shaders/readWaterLevelFragmentShader.glsl'
@@ -60,16 +60,15 @@ const RAYCAST_PLANE_SEGMENTS = 1 // Number of segments for raycast plane
 // Floating point precision
 const DECIMAL_PRECISION = 1 // Decimal places precision for BOUNDS values
 
-extend({ WaterMaterial })
-
 const { renderer, camera, raycaster, scene } = useTresContext()
 const { render } = useLoop()
+
 const waterMesh = shallowRef()
 const meshRay = shallowRef()
 
 // Calculate square size based on largest dimension of visible area
 const BOUNDS = computed(() => {
-  if (!camera.value) return DEFAULT_WATER_BOUNDS
+  if (!camera.value || typeof window === 'undefined' ) return DEFAULT_WATER_BOUNDS
   
   const aspect = window.innerWidth / window.innerHeight
   const fov = camera.value.fov * Math.PI / 180
@@ -85,6 +84,15 @@ const BOUNDS = computed(() => {
   // Add margin and return square size
   return maxDimension * BOUNDS_MARGIN
 })
+
+const waterMaterial = ref(new WaterMaterial({
+  color: WATER_COLOR,
+  metalness: WATER_METALNESS,
+  roughness: WATER_ROUGHNESS,
+  transparent: false,
+  opacity: WATER_OPACITY,
+  side: THREE.DoubleSide
+}, TEXTURE_WIDTH, BOUNDS.value))
 
 let tmpHeightmap = null;
 const mouseCoords = new THREE.Vector2();
@@ -265,7 +273,7 @@ defineExpose({
 
 onMounted(async () => {
   init();
-  
+
   // Load environment asynchronously
   await loadEnvironment();
   
@@ -299,6 +307,7 @@ onUnmounted(() => {
 <template>
   <TresMesh
     ref="waterMesh"
+    :material="waterMaterial"
     receive-shadow
     cast-shadow
     matrix-auto-update
@@ -308,14 +317,14 @@ onUnmounted(() => {
     @pointer-up="onPointerUp"
   >
     <TresPlaneGeometry :args="[BOUNDS, BOUNDS, TEXTURE_WIDTH - 1, TEXTURE_WIDTH - 1]" />
-    <TresWaterMaterial :args="[{
-          color: WATER_COLOR,
-          metalness: WATER_METALNESS,
-          roughness: WATER_ROUGHNESS,
-          transparent: false,
-          opacity: WATER_OPACITY,
-          side: THREE.DoubleSide
-        }, TEXTURE_WIDTH, BOUNDS]"/>
+<!--    <TresWaterMaterial :args="[{-->
+<!--          color: WATER_COLOR,-->
+<!--          metalness: WATER_METALNESS,-->
+<!--          roughness: WATER_ROUGHNESS,-->
+<!--          transparent: false,-->
+<!--          opacity: WATER_OPACITY,-->
+<!--          side: THREE.DoubleSide-->
+<!--        }, TEXTURE_WIDTH, BOUNDS]"/>-->
   </TresMesh>
   <TresMesh ref="meshRay" matrix-auto-update :rotation-x="PLANE_ROTATION_X">
     <TresPlaneGeometry :args="[BOUNDS, BOUNDS, RAYCAST_PLANE_SEGMENTS, RAYCAST_PLANE_SEGMENTS]" />
