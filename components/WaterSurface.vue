@@ -42,7 +42,7 @@ const RESIZE_DEBOUNCE_MS = 100 // Debounce delay for resize (ms)
 
 // Colors and materials
 const BACKGROUND_COLOR = 0x000000 // Scene background color
-const WATER_COLOR = 0x333333 // Water color
+const WATER_COLOR = 0x9bd2ec // Water color
 const WATER_METALNESS = 0.9 // Water material metalness
 const WATER_ROUGHNESS = 0 // Water material roughness
 const WATER_OPACITY = 0.8 // Water transparency
