@@ -1,20 +1,19 @@
 <script setup lang="ts">
-import * as THREE from 'three'
-import { GPUComputationRenderer } from 'three/addons/misc/GPUComputationRenderer'
-import type { Variable } from 'three/addons/misc/GPUComputationRenderer'
-import { RGBELoader } from 'three/addons/loaders/RGBELoader'
-import { WaterMaterial } from '~/materials/WaterMaterial'
-import { useTresContext, useLoop } from '@tresjs/core'
-import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
-import smoothFragmentShader from '~/assets/shaders/smoothFragmentShader.glsl'
-import readWaterLevelFragmentShader from '~/assets/shaders/readWaterLevelFragmentShader.glsl'
-import shaderChangeHeightmapFrag from '~/assets/shaders/shaderChangeHeightmapFrag.glsl'
+import { type Intersection, useLoop, useTresContext } from "@tresjs/core";
+import * as THREE from "three";
+import { RGBELoader } from "three/addons/loaders/RGBELoader";
+import type { Variable } from "three/addons/misc/GPUComputationRenderer";
+import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer";
+
+import readWaterLevelFragmentShader from "~/assets/shaders/readWaterLevelFragmentShader.glsl";
+import shaderChangeHeightmapFrag from "~/assets/shaders/shaderChangeHeightmapFrag.glsl";
+import { WaterMaterial } from "~/materials/WaterMaterial";
 
 // ========== CONFIGURATION CONSTANTS ==========
 // Simulation
-const TEXTURE_WIDTH = 128 // Heightmap texture resolution
-const DEFAULT_WATER_BOUNDS = 6 // Default water surface size in world units
-const BOUNDS_MARGIN = 1.2 // Margin for calculated surface size (20% more)
+const TEXTURE_WIDTH = 128; // Heightmap texture resolution
+const DEFAULT_WATER_BOUNDS = 6; // Default water surface size in world units
+const BOUNDS_MARGIN = 1.2; // Margin for calculated surface size (20% more)
 
 // Mouse/interaction parameters
 const MOUSE_OUTSIDE_POSITION = 10000 // Mouse position when outside surface

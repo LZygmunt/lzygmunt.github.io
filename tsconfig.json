@@ -3,7 +3,9 @@
   "extends": "./.nuxt/tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "three/addons/*": ["node_modules/@types/three/examples/jsm/*"]
+      "three/addons/*": ["./node_modules/@types/three/examples/jsm/*"],
+      "~/*": ["./*"],
+      "@/*": ["./*"]
     },
   }
 }
