@@ -1,16 +1,10 @@
 <script setup lang="ts">
 import * as THREE from "three";
-import Stats from "three/addons/libs/stats.module";
 
 import WaterSurface from "~/components/WaterSurface.vue";
 
 const ratio = computed(() => window.innerWidth / window.innerHeight);
 const devicePixelRatio = computed(() => window?.devicePixelRatio ?? 1);
-
-
-const waterSurface = shallowRef();
-
-
 </script>
 
 <template>
@@ -20,10 +14,6 @@ const waterSurface = shallowRef();
       :position="[0, 4, 0]"
       :look-at="[0, 0, 0]"
   />
-    <WaterSurface ref="waterSurface" />
+    <WaterSurface />
   </TresCanvas>
 </template>
-
-<style>
-
-</style>

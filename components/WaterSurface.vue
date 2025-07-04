@@ -7,7 +7,9 @@ import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer
 
 import readWaterLevelFragmentShader from "~/assets/shaders/readWaterLevelFragmentShader.glsl";
 import shaderChangeHeightmapFrag from "~/assets/shaders/shaderChangeHeightmapFrag.glsl";
+import DropManager from "~/effects/DropManager";
 import { WaterMaterial } from "~/materials/WaterMaterial";
+import { useWindowResize } from "~/useWindowResize";
 
 // ========== CONFIGURATION CONSTANTS ==========
 // Simulation
@@ -15,97 +17,81 @@ const TEXTURE_WIDTH = 128; // Heightmap texture resolution
 const DEFAULT_WATER_BOUNDS = 6; // Default water surface size in world units
 const BOUNDS_MARGIN = 1.2; // Margin for calculated surface size (20% more)
 
-// Mouse/interaction parameters
-const MOUSE_OUTSIDE_POSITION = 10000 // Mouse position when outside surface
-const MOUSE_SIZE = 0.2 // Mouse effect size
-const MOUSE_COORDS_NORMALIZE_MIN = -1 // Mouse coordinate normalization (minimum)
-const MOUSE_COORDS_NORMALIZE_MAX = 1 // Mouse coordinate normalization (maximum)
-
-// Water physics parameters
-const WATER_VISCOSITY = 0.93 // Water viscosity (0-1, higher = less damped)
-const WATER_DEPTH = 0.01 // Water depth
-const WATER_MAX_HEIGHT = 0.1 // Maximum wave height
-
-// Noise generation
-const NOISE_ITERATIONS = 15 // Number of iterations for noise generation
-const NOISE_MULTIPLIER_BASE = 0.025 // Base multiplier for noise
-const NOISE_MULTIPLIER_DECAY = 0.53 // Multiplier decay coefficient
-const NOISE_MULTIPLIER_INCREMENT = 0.025 // Multiplier increment per iteration
-const NOISE_SCALE_MULTIPLIER = 1.25 // Noise scale multiplier per iteration
-const NOISE_TEXTURE_SIZE = 128 // Noise texture size
+// Drop/interactions parameters
+const MOUSE_COORDS_NORMALIZE_MIN = -1; // Mouse coordinate normalization (minimum)
+const MOUSE_COORDS_NORMALIZE_MAX = 1; // Mouse coordinate normalization (maximum)
 
 // Rendering and performance
-const FRAME_SKIP_BASE = 7 // Base number of frames to skip
-const DEFAULT_EFFECT_SPEED = 6 // Default effect speed
-const RESIZE_DEBOUNCE_MS = 100 // Debounce delay for resize (ms)
+const FRAME_SKIP_BASE = 7; // Base number of frames to skip
+const DEFAULT_EFFECT_SPEED = 6; // Default effect speed
 
 // Colors and materials
-const BACKGROUND_COLOR = 0x000000 // Scene background color
-const WATER_COLOR = 0x9bd2ec // Water color
-const WATER_METALNESS = 0.9 // Water material metalness
-const WATER_ROUGHNESS = 0 // Water material roughness
-const WATER_OPACITY = 0.8 // Water transparency
-const INVISIBLE_MATERIAL_COLOR = 0xFFFFFF // Invisible raycast material color
-
-// Render targets
-const WATER_LEVEL_RT_WIDTH = 4 // Water level render target width
-const WATER_LEVEL_RT_HEIGHT = 1 // Water level render target height
-const WATER_LEVEL_IMAGE_SIZE = 4 * 1 * 4 // Pixel array size (RGBA * width * height)
+const BACKGROUND_COLOR = 0x000000; // Scene background color
+const WATER_COLOR = 0x9bd2ec; // Water color
+const WATER_METALNESS = 0.9; // Water material metalness
+const WATER_ROUGHNESS = 0; // Water material roughness
+const WATER_OPACITY = 0.8; // Water transparency
+const INVISIBLE_MATERIAL_COLOR = 0xffffff; // Invisible raycast material color
 
 // Geometry
-const PLANE_ROTATION_X = -Math.PI * 0.5 // Plane rotation (90 degrees down)
-const RAYCAST_PLANE_SEGMENTS = 1 // Number of segments for raycast plane
+const PLANE_ROTATION_X = -Math.PI * 0.5; // Plane rotation (90 degrees down)
+const RAYCAST_PLANE_SEGMENTS = 1; // Number of segments for raycast plane
 
 // Floating point precision
-const DECIMAL_PRECISION = 1 // Decimal places precision for BOUNDS values
+const DECIMAL_PRECISION = 1; // Decimal places precision for BOUNDS values
 
-const { renderer, camera, raycaster, scene } = useTresContext()
-const { render } = useLoop()
+const { renderer, camera, raycaster, scene } = useTresContext();
+const { render } = useLoop();
 
-const waterMesh = shallowRef()
-const meshRay = shallowRef()
+const waterMesh = shallowRef();
+const meshRay = shallowRef();
 
 // Calculate square size based on largest dimension of visible area
 const BOUNDS = computed(() => {
-  if (!camera.value || typeof window === 'undefined' ) return DEFAULT_WATER_BOUNDS
-  
-  const aspect = window.innerWidth / window.innerHeight
-  const fov = camera.value.fov * Math.PI / 180
-  const distance = camera.value.position.y // Camera height above surface
-  
-  // Calculate visible area height at y=0 level
-  const visibleHeight = 2 * Math.tan(fov / 2) * distance
-  const visibleWidth = visibleHeight * aspect
-  
-  // Use larger dimension so surface covers entire visible area
-  const maxDimension = Math.max(visibleWidth, visibleHeight)
-  
-  // Add margin and return square size
-  return maxDimension * BOUNDS_MARGIN
-})
+  if (!camera.value || typeof window === "undefined") return DEFAULT_WATER_BOUNDS;
 
-const waterMaterial = ref(new WaterMaterial({
-  color: WATER_COLOR,
-  metalness: WATER_METALNESS,
-  roughness: WATER_ROUGHNESS,
-  transparent: false,
-  opacity: WATER_OPACITY,
-  side: THREE.DoubleSide
-}, TEXTURE_WIDTH, BOUNDS.value))
+  const aspect = window.innerWidth / window.innerHeight;
+  // @ts-expect-error something wrong with type camera and did not see fov field
+  const fov = (camera.value.fov * Math.PI) / 180;
+  const distance = camera.value.position.y; // Camera height above surface
+
+  // Calculate visible area height at y=0 level
+  const visibleHeight = 2 * Math.tan(fov / 2) * distance;
+  const visibleWidth = visibleHeight * aspect;
+
+  // Use larger dimension so surface covers entire visible area
+  const maxDimension = Math.max(visibleWidth, visibleHeight);
+
+  // Add margin and return square size
+  return maxDimension * BOUNDS_MARGIN;
+});
+
+const dropManager = ref(new DropManager(BOUNDS.value / 2));
+
+const waterMaterial = ref(
+  new WaterMaterial(
+    {
+      color: WATER_COLOR,
+      metalness: WATER_METALNESS,
+      roughness: WATER_ROUGHNESS,
+      transparent: false,
+      opacity: WATER_OPACITY,
+      side: THREE.DoubleSide,
+    },
+    TEXTURE_WIDTH,
+    BOUNDS.value,
+  ),
+);
 
 let tmpHeightmap = null;
 const mouseCoords = new THREE.Vector2();
-const simplex = new SimplexNoise();
 let gpuCompute: GPUComputationRenderer;
 let heightmapVariable: Variable;
-let smoothShader;
-let readWaterLevelShader;
-let readWaterLevelRenderTarget;
-let readWaterLevelImage;
+let readWaterLevelShader: THREE.ShaderMaterial;
 let frame = 0;
 let mousedown = false;
-let effectController = {
-  speed: DEFAULT_EFFECT_SPEED
+const effectController = {
+  speed: DEFAULT_EFFECT_SPEED,
 };
 
 // Move environment loading to async function
@@ -115,11 +101,11 @@ async function loadEnvironment() {
   try {
     // Use THREE.RGBELoader directly instead of useLoader
     const loader = new RGBELoader();
-    env = await loader.loadAsync('./textures/equirectangular/blouberg_sunrise_2_1k.hdr');
+    env = await loader.loadAsync("./textures/equirectangular/blouberg_sunrise_2_1k.hdr");
     env.mapping = THREE.EquirectangularReflectionMapping;
-    
+
     if (scene.value) {
-      scene.value.background = new THREE.Color(BACKGROUND_COLOR)
+      scene.value.background = new THREE.Color(BACKGROUND_COLOR);
       scene.value.environment = env;
     }
   } catch (error) {
@@ -134,17 +120,13 @@ async function loadEnvironment() {
 function init() {
   waterMesh.value.updateMatrix();
   meshRay.value.updateMatrix();
-  gpuCompute = new GPUComputationRenderer(TEXTURE_WIDTH, TEXTURE_WIDTH, renderer.value)
-  const heightmap0 = gpuCompute.createTexture()
-// fillTexture(heightmap0)
-  heightmapVariable = gpuCompute.addVariable('heightmap', shaderChangeHeightmapFrag, heightmap0);
+  gpuCompute = new GPUComputationRenderer(TEXTURE_WIDTH, TEXTURE_WIDTH, renderer.value);
+  const heightmap0 = gpuCompute.createTexture();
 
+  heightmapVariable = gpuCompute.addVariable("heightmap", shaderChangeHeightmapFrag, heightmap0);
   gpuCompute.setVariableDependencies(heightmapVariable, [heightmapVariable]);
 
-  heightmapVariable.material.uniforms['mousePos'] = { value: new THREE.Vector2(MOUSE_OUTSIDE_POSITION, MOUSE_OUTSIDE_POSITION) };
-  heightmapVariable.material.uniforms['mouseSize'] = { value: MOUSE_SIZE  };
-  heightmapVariable.material.uniforms['viscosity'] = { value: WATER_VISCOSITY };
-  heightmapVariable.material.uniforms['deep'] = { value: WATER_DEPTH };
+  heightmapVariable.material.uniforms = dropManager.value.toUniforms();
   heightmapVariable.material.defines.BOUNDS = BOUNDS.value.toFixed(DECIMAL_PRECISION);
 
   const error = gpuCompute.init();
@@ -152,52 +134,10 @@ function init() {
 
   readWaterLevelShader = gpuCompute.createShaderMaterial(readWaterLevelFragmentShader, {
     point1: { value: new THREE.Vector2() },
-    levelTexture: { value: null }
+    levelTexture: { value: null },
   });
   readWaterLevelShader.defines.WIDTH = TEXTURE_WIDTH.toFixed(DECIMAL_PRECISION);
   readWaterLevelShader.defines.BOUNDS = BOUNDS.value.toFixed(DECIMAL_PRECISION);
-
-  readWaterLevelImage = new Uint8Array(WATER_LEVEL_IMAGE_SIZE);
-
-  readWaterLevelRenderTarget = new THREE.WebGLRenderTarget(WATER_LEVEL_RT_WIDTH, WATER_LEVEL_RT_HEIGHT, {
-    wrapS: THREE.ClampToEdgeWrapping,
-    wrapT: THREE.ClampToEdgeWrapping,
-    minFilter: THREE.NearestFilter,
-    magFilter: THREE.NearestFilter,
-    format: THREE.RGBAFormat,
-    type: THREE.UnsignedByteType,
-    depthBuffer: false
-  });
-}
-
-function fillTexture( texture: THREE.DataTexture ) {
-  const waterMaxHeight = WATER_MAX_HEIGHT;
-
-  function noise( x: number, y: number ) {
-    let multR = waterMaxHeight;
-    let mult = NOISE_MULTIPLIER_BASE;
-    let r = 0;
-    for ( let i = 0; i < NOISE_ITERATIONS; i ++ ) {
-      r += multR * simplex.noise( x * mult, y * mult );
-      multR *= NOISE_MULTIPLIER_DECAY + NOISE_MULTIPLIER_INCREMENT * i;
-      mult *= NOISE_SCALE_MULTIPLIER
-    }
-    return r;
-  }
-
-  const pixels = texture.image.data;
-  let p = 0;
-  for ( let j = 0; j < TEXTURE_WIDTH; j ++ ) {
-    for ( let i = 0; i < TEXTURE_WIDTH; i ++ ) {
-      const x = i * NOISE_TEXTURE_SIZE / TEXTURE_WIDTH;
-      const y = j * NOISE_TEXTURE_SIZE / TEXTURE_WIDTH;
-      pixels[ p + 0 ] = noise( x, y );
-      pixels[ p + 1 ] = pixels[ p + 0 ];
-      pixels[ p + 2 ] = 0;
-      pixels[ p + 3 ] = 1;
-      p += 4;
-    }
-  }
 }
 
 function onPointerDown() {
@@ -208,80 +148,78 @@ function onPointerUp() {
   mousedown = false;
 }
 
-function onPointerMove(event) {
+function onPointerMove(event: PointerEvent & Intersection) {
   const dom = renderer.value.domElement;
   mouseCoords.set(
-    (event.clientX / dom.clientWidth) * (MOUSE_COORDS_NORMALIZE_MAX - MOUSE_COORDS_NORMALIZE_MIN) + MOUSE_COORDS_NORMALIZE_MIN,
-    -((event.clientY / dom.clientHeight) * (MOUSE_COORDS_NORMALIZE_MAX - MOUSE_COORDS_NORMALIZE_MIN) - MOUSE_COORDS_NORMALIZE_MAX)
+    (event.clientX / dom.clientWidth) * (MOUSE_COORDS_NORMALIZE_MAX - MOUSE_COORDS_NORMALIZE_MIN) +
+      MOUSE_COORDS_NORMALIZE_MIN,
+    -(
+      (event.clientY / dom.clientHeight) *
+        (MOUSE_COORDS_NORMALIZE_MAX - MOUSE_COORDS_NORMALIZE_MIN) -
+      MOUSE_COORDS_NORMALIZE_MAX
+    ),
   );
 }
 
-let x,y = x = 0
 function raycast() {
-  const uniforms = heightmapVariable.material.uniforms;
   if (mousedown) {
+    const uniforms = heightmapVariable.material.uniforms;
     raycaster.value.setFromCamera(mouseCoords, camera.value!);
     const intersects = raycaster.value.intersectObject(meshRay.value);
+
     if (intersects.length > 0) {
       const point = intersects[0].point;
-      x = mousedown ? point.x : Math.random() * BOUNDS.value * 2 - BOUNDS.value
-      y = mousedown ? point.z : Math.random() * BOUNDS.value * 2 - BOUNDS.value
-      uniforms['mousePos'].value.set(x, y);
+      dropManager.value.updateDropOn(0, {
+        x: point.x,
+        y: point.z,
+      });
+
+      dropManager.value.updateUniforms(uniforms);
     } else {
-      uniforms['mousePos'].value.set(MOUSE_OUTSIDE_POSITION, MOUSE_OUTSIDE_POSITION);
+      dropManager.value.resetDrops();
     }
   } else {
-    uniforms['mousePos'].value.set(MOUSE_OUTSIDE_POSITION, MOUSE_OUTSIDE_POSITION);
+    dropManager.value.resetDrops();
   }
 }
 
-function makeDrop() {
-  mousedown = true;
-  const uniforms = heightmapVariable.material.uniforms;
-  uniforms['mousePos'].value.set(Math.random() * BOUNDS.value * 2 - BOUNDS.value, Math.random() * BOUNDS.value * 2- BOUNDS.value);
-  // console.log( `Drop at -> [${uniforms['mousePos'].value.x}, ${uniforms['mousePos'].value.y}]`, )
-  // setTimeout(() => { mousedown = false; }, 400)
-}
-
-// Listen for window resize changes
-let resizeTimeout: NodeJS.Timeout
 function handleResize() {
-  clearTimeout(resizeTimeout)
-  resizeTimeout = setTimeout(() => {
-    if (waterMesh.value && meshRay.value) {
-      // Update geometries with new square size
-      waterMesh.value.geometry.dispose()
-      meshRay.value.geometry.dispose()
+  if (waterMesh.value && meshRay.value) {
+    // Update geometries with new square size
+    waterMesh.value.geometry.dispose();
+    meshRay.value.geometry.dispose();
 
-      waterMesh.value.geometry = new THREE.PlaneGeometry(BOUNDS.value, BOUNDS.value, TEXTURE_WIDTH - 1, TEXTURE_WIDTH - 1)
-      meshRay.value.geometry = new THREE.PlaneGeometry(BOUNDS.value, BOUNDS.value, RAYCAST_PLANE_SEGMENTS, RAYCAST_PLANE_SEGMENTS)
+    waterMesh.value.geometry = new THREE.PlaneGeometry(
+      BOUNDS.value,
+      BOUNDS.value,
+      TEXTURE_WIDTH - 1,
+      TEXTURE_WIDTH - 1,
+    );
+    meshRay.value.geometry = new THREE.PlaneGeometry(
+      BOUNDS.value,
+      BOUNDS.value,
+      RAYCAST_PLANE_SEGMENTS,
+      RAYCAST_PLANE_SEGMENTS,
+    );
 
-      // Update BOUNDS in shaders
-      if (heightmapVariable) {
-        heightmapVariable.material.defines.BOUNDS = BOUNDS.value.toFixed(DECIMAL_PRECISION);
-        heightmapVariable.material.needsUpdate = true;
-      }
-      if (readWaterLevelShader) {
-        readWaterLevelShader.defines.BOUNDS = BOUNDS.value.toFixed(DECIMAL_PRECISION);
-        readWaterLevelShader.needsUpdate = true;
-      }
+    // Update BOUNDS in shaders
+    if (heightmapVariable) {
+      heightmapVariable.material.defines.BOUNDS = BOUNDS.value.toFixed(DECIMAL_PRECISION);
+      heightmapVariable.material.needsUpdate = true;
     }
-  }, RESIZE_DEBOUNCE_MS)
+    if (readWaterLevelShader) {
+      readWaterLevelShader.defines.BOUNDS = BOUNDS.value.toFixed(DECIMAL_PRECISION);
+      readWaterLevelShader.needsUpdate = true;
+    }
+  }
 }
-
-defineExpose({
-  makeDrop,
-})
 
 onMounted(async () => {
   init();
 
   // Load environment asynchronously
   await loadEnvironment();
-  
-  // Add window resize listener
-  window.addEventListener('resize', handleResize)
-  
+
   render(({ renderer, scene, camera }) => {
     raycast();
     frame++;
@@ -298,12 +236,7 @@ onMounted(async () => {
   });
 });
 
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-  if (resizeTimeout) {
-    clearTimeout(resizeTimeout)
-  }
-})
+useWindowResize(handleResize);
 </script>
 
 <template>
