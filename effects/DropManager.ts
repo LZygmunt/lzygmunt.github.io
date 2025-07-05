@@ -4,13 +4,6 @@ import { getRandomArbitrary } from "~/utils/getRandomArbitrary";
 
 import Drop, { type DropParameters } from "./Drop";
 
-const MAX_DROP_SIZE = 0.5;
-const MAX_DROP_DEPTH = 0.04;
-const MAX_DROP_VISCOSITY = 1;
-const MIN_DROP_SIZE = 0.05;
-const MIN_DROP_DEPTH = 0.001;
-const MIN_DROP_VISCOSITY = 0.01;
-
 class DropManager {
   activeDrops: number;
   drops: Drop[];
@@ -30,12 +23,13 @@ class DropManager {
   }
 
   makeDrops(count = MAX_DROPS) {
+    const size = getRandomArbitrary(MIN_DROP_SIZE, MAX_DROP_SIZE);
     for (let i = 0; i < count; i++) {
       this.updateDropOn(i, {
         x: getRandomArbitrary(this.bounds * -1, this.bounds),
         y: getRandomArbitrary(this.bounds * -1, this.bounds),
-        size: getRandomArbitrary(MIN_DROP_SIZE, MAX_DROP_SIZE),
-        depth: getRandomArbitrary(MIN_DROP_DEPTH, MAX_DROP_DEPTH),
+        size,
+        depth: size * getRandomArbitrary(MIN_DROP_DEPTH, MAX_DROP_DEPTH),
       });
     }
   }
@@ -49,11 +43,12 @@ class DropManager {
 
       const x = startPoint.x + offsetX;
       const y = startPoint.y + offsetY;
+      const size = getRandomArbitrary(MIN_DROP_SIZE, MAX_DROP_SIZE);
       this.updateDropOn(i, {
         x,
         y,
-        size: getRandomArbitrary(MIN_DROP_SIZE, MAX_DROP_SIZE),
-        depth: getRandomArbitrary(MIN_DROP_DEPTH, MAX_DROP_DEPTH),
+        size,
+        depth: size * getRandomArbitrary(MIN_DROP_DEPTH, MAX_DROP_DEPTH),
       });
     }
   }
@@ -81,6 +76,10 @@ class DropManager {
 }
 
 export const MAX_DROPS = 10;
+export const MAX_DROP_SIZE = 0.5;
+export const MAX_DROP_DEPTH = 0.04;
+export const MIN_DROP_SIZE = 0.05;
+export const MIN_DROP_DEPTH = 0.01;
 
 export interface DropUniforms {
   drops: THREE.IUniform<Drop[]>;

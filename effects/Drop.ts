@@ -31,8 +31,8 @@ class Drop {
   }
 }
 
-export const DEFAULT_DROP_DEPTH = 0.01; // Tells how far drop goes into water surface (0-1, higher = deeper).
 export const DEFAULT_DROP_SIZE = 0.2; // Tells how big drop should be (0-1, higher = bigger).
+export const DEFAULT_DROP_DEPTH = 0.01 * DEFAULT_DROP_SIZE; // Tells how far drop goes into water surface (0-1, higher = deeper).
 export const DEFAULT_DROP_OUTSIDE_POSITION = 10000;
 
 export default Drop;

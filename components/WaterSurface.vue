@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { type Intersection, useLoop, useTresContext } from "@tresjs/core";
 import * as THREE from "three";
+import { GUI } from "three/addons/libs/lil-gui.module.min";
 import { RGBELoader } from "three/addons/loaders/RGBELoader";
 import type { Variable } from "three/addons/misc/GPUComputationRenderer";
 import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer";
 
 import readWaterLevelFragmentShader from "~/assets/shaders/readWaterLevelFragmentShader.glsl";
 import shaderChangeHeightmapFrag from "~/assets/shaders/shaderChangeHeightmapFrag.glsl";
+import { DEFAULT_DROP_DEPTH, DEFAULT_DROP_SIZE } from "~/effects/Drop";
 import DropManager from "~/effects/DropManager";
 import { WaterMaterial } from "~/materials/WaterMaterial";
 import { useWindowResize } from "~/useWindowResize";
@@ -90,9 +92,11 @@ let heightmapVariable: Variable;
 let readWaterLevelShader: THREE.ShaderMaterial;
 let frame = 0;
 let mousedown = false;
-const effectController = {
+const effectController = reactive({
   speed: DEFAULT_EFFECT_SPEED,
-};
+  size: DEFAULT_DROP_SIZE,
+  depth: DEFAULT_DROP_DEPTH,
+});
 
 // Move environment loading to async function
 let env: THREE.DataTexture | null = null;
@@ -115,6 +119,14 @@ async function loadEnvironment() {
       scene.value.background = new THREE.Color(BACKGROUND_COLOR);
     }
   }
+}
+
+function initGui() {
+  const gui = new GUI();
+  gui.domElement.style.right = "0px";
+
+  gui.add(effectController, "size", 0.05, 0.25, 0.01);
+  gui.add(effectController, "depth", 0.001, 0.04, 0.001);
 }
 
 function init() {
@@ -172,6 +184,8 @@ function raycast() {
       dropManager.value.updateDropOn(0, {
         x: point.x,
         y: point.z,
+        size: effectController.size,
+        depth: effectController.depth,
       });
 
       dropManager.value.updateUniforms(uniforms);
