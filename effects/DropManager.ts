@@ -1,7 +1,5 @@
 import type * as THREE from "three";
 
-// import { getRandomArbitrary } from "~/utils/getRandomArbitrary";
-
 import Drop, { DEFAULT_DROP_OUTSIDE_POSITION, type DropParameters } from "./Drop";
 
 class DropManager {
@@ -22,33 +20,13 @@ class DropManager {
     this.activeDrops = this.activeDrops + (1 % MAX_DROPS);
   }
 
-  makeDrops(count = MAX_DROPS) {
-    const size = getRandomArbitrary(MIN_DROP_SIZE, MAX_DROP_SIZE);
-    for (let i = 0; i < count; i++) {
-      this.updateDropOn(i, {
-        x: getRandomArbitrary(this.bounds * -1, this.bounds),
-        y: getRandomArbitrary(this.bounds * -1, this.bounds),
-        size,
-        depth: size * getRandomArbitrary(MIN_DROP_DEPTH, MAX_DROP_DEPTH),
-      });
-    }
-  }
-
-  makeDropsInRadius(startPoint: { x: number; y: number }, count = MAX_DROPS, spreadRadius: number) {
-    for (let i = 0; i < count; i++) {
-      const radius = getRandomArbitrary(spreadRadius);
-      const angle = getRandomArbitrary(Math.PI * 2);
-      const offsetX = Math.cos(angle) * radius;
-      const offsetY = Math.sin(angle) * radius;
-
-      const x = startPoint.x + offsetX;
-      const y = startPoint.y + offsetY;
-      const size = getRandomArbitrary(MIN_DROP_SIZE, MAX_DROP_SIZE);
-      this.updateDropOn(i, {
-        x,
-        y,
-        size,
-        depth: size * getRandomArbitrary(MIN_DROP_DEPTH, MAX_DROP_DEPTH),
+  spawnDrop(dropParameters: DropParameters) {
+    const index = this.activeDrops % MAX_DROPS;
+    this.updateDropOn(index, dropParameters);
+    setTimeout(() => {
+      this.updateDropOn(index, {
+        x: DEFAULT_DROP_OUTSIDE_POSITION,
+        y: DEFAULT_DROP_OUTSIDE_POSITION,
       });
     });
   }
