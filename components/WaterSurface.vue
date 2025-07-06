@@ -9,7 +9,8 @@ import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer
 import readWaterLevelFragmentShader from "~/assets/shaders/readWaterLevelFragmentShader.glsl";
 import shaderChangeHeightmapFrag from "~/assets/shaders/shaderChangeHeightmapFrag.glsl";
 import { DEFAULT_DROP_DEPTH, DEFAULT_DROP_SIZE } from "~/effects/Drop";
-import DropManager from "~/effects/DropManager";
+import DropManager, { MAX_DROPS } from "~/effects/DropManager";
+import RainSystem from "~/effects/RainSystem";
 import { WaterMaterial } from "~/materials/WaterMaterial";
 import { useWindowResize } from "~/useWindowResize";
 
@@ -69,6 +70,7 @@ const BOUNDS = computed(() => {
 });
 
 const dropManager = ref(new DropManager(BOUNDS.value / 2));
+const rainSystem = ref<RainSystem | null>(null);
 
 const waterMaterial = ref(
   new WaterMaterial(
@@ -96,6 +98,7 @@ const effectController = reactive({
   speed: DEFAULT_EFFECT_SPEED,
   size: DEFAULT_DROP_SIZE,
   depth: DEFAULT_DROP_DEPTH,
+  rainIntensity: 0,
 });
 
 // Move environment loading to async function
@@ -123,10 +126,10 @@ async function loadEnvironment() {
 
 function initGui() {
   const gui = new GUI();
-  gui.domElement.style.right = "0px";
+  gui.domElement.style.right = "20px";
+  gui.domElement.style.top = "20px";
 
-  gui.add(effectController, "size", 0.05, 0.25, 0.01);
-  gui.add(effectController, "depth", 0.001, 0.04, 0.001);
+  gui.add(effectController, "rainIntensity", 0, 15, 1);
 }
 
 function init() {
@@ -140,6 +143,12 @@ function init() {
 
   heightmapVariable.material.uniforms = dropManager.value.toUniforms();
   heightmapVariable.material.defines.BOUNDS = BOUNDS.value.toFixed(DECIMAL_PRECISION);
+
+  rainSystem.value = new RainSystem(
+    dropManager.value,
+    heightmapVariable.material.uniforms,
+    MAX_DROPS,
+  );
 
   const error = gpuCompute.init();
   if (error !== null) console.error(error);
@@ -229,15 +238,22 @@ function handleResize() {
 }
 
 onMounted(async () => {
+  initGui();
+
   init();
 
   // Load environment asynchronously
   await loadEnvironment();
-
+  let tempRainFrames = 0;
   render(({ renderer, scene, camera }) => {
     raycast();
     frame++;
+    tempRainFrames++;
 
+    if (tempRainFrames > 90 / effectController.rainIntensity) {
+      rainSystem.value?.rain(effectController.rainIntensity);
+      tempRainFrames = 0;
+    }
     if (frame >= FRAME_SKIP_BASE - effectController.speed) {
       gpuCompute.compute();
       tmpHeightmap = gpuCompute.getCurrentRenderTarget(heightmapVariable).texture;

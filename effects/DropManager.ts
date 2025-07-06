@@ -1,8 +1,8 @@
 import type * as THREE from "three";
 
-import { getRandomArbitrary } from "~/utils/getRandomArbitrary";
+// import { getRandomArbitrary } from "~/utils/getRandomArbitrary";
 
-import Drop, { type DropParameters } from "./Drop";
+import Drop, { DEFAULT_DROP_OUTSIDE_POSITION, type DropParameters } from "./Drop";
 
 class DropManager {
   activeDrops: number;
@@ -19,7 +19,7 @@ class DropManager {
 
   updateDropOn(index: number, dropParameters: DropParameters) {
     this.drops[index].makeDrop(dropParameters);
-    this.activeDrops++;
+    this.activeDrops = this.activeDrops + (1 % MAX_DROPS);
   }
 
   makeDrops(count = MAX_DROPS) {
@@ -50,7 +50,7 @@ class DropManager {
         size,
         depth: size * getRandomArbitrary(MIN_DROP_DEPTH, MAX_DROP_DEPTH),
       });
-    }
+    });
   }
 
   resetDrops() {
@@ -73,9 +73,13 @@ class DropManager {
       uniforms.activeDrops.value = this.activeDrops;
     }
   }
+
+  setBounds(bounds: number) {
+    this.bounds = bounds;
+  }
 }
 
-export const MAX_DROPS = 10;
+export const MAX_DROPS = 100;
 export const MAX_DROP_SIZE = 0.5;
 export const MAX_DROP_DEPTH = 0.04;
 export const MIN_DROP_SIZE = 0.05;

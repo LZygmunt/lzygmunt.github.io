@@ -1,6 +1,6 @@
 #include <common>
 
-#define MAX_DROPS 10
+#define MAX_DROPS 100
 
 struct Drop {
     vec2 position;
