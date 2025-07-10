@@ -51,7 +51,9 @@ const meshRay = shallowRef();
 
 // Calculate square size based on largest dimension of visible area
 const BOUNDS = computed(() => {
-  if (!camera.value || typeof window === "undefined") return DEFAULT_WATER_BOUNDS;
+  if (!camera.value || typeof window === "undefined") {
+    return DEFAULT_WATER_BOUNDS;
+  }
 
   const aspect = window.innerWidth / window.innerHeight;
   // @ts-expect-error something wrong with type camera and did not see fov field
@@ -66,7 +68,7 @@ const BOUNDS = computed(() => {
   const maxDimension = Math.max(visibleWidth, visibleHeight);
 
   // Add margin and return square size
-  return maxDimension * BOUNDS_MARGIN;
+  return Math.ceil(maxDimension * BOUNDS_MARGIN);
 });
 
 const dropManager = ref(new DropManager(BOUNDS.value / 2));
@@ -99,6 +101,7 @@ const effectController = reactive({
   size: DEFAULT_DROP_SIZE,
   depth: DEFAULT_DROP_DEPTH,
   rainIntensity: 0,
+  delayedVersion: true,
 });
 
 // Move environment loading to async function
@@ -130,6 +133,7 @@ function initGui() {
   gui.domElement.style.top = "20px";
 
   gui.add(effectController, "rainIntensity", 0, 15, 1);
+  gui.add(effectController, "delayedVersion");
 }
 
 function init() {
@@ -151,7 +155,9 @@ function init() {
   );
 
   const error = gpuCompute.init();
-  if (error !== null) console.error(error);
+  if (error !== null) {
+    console.error(error);
+  }
 
   readWaterLevelShader = gpuCompute.createShaderMaterial(readWaterLevelFragmentShader, {
     point1: { value: new THREE.Vector2() },
@@ -198,11 +204,7 @@ function raycast() {
       });
 
       dropManager.value.updateUniforms(uniforms);
-    } else {
-      dropManager.value.resetDrops();
     }
-  } else {
-    dropManager.value.resetDrops();
   }
 }
 
@@ -251,14 +253,16 @@ onMounted(async () => {
     tempRainFrames++;
 
     if (tempRainFrames > 90 / effectController.rainIntensity) {
-      rainSystem.value?.rain(effectController.rainIntensity);
+      rainSystem.value?.rain(effectController.rainIntensity, effectController.delayedVersion);
       tempRainFrames = 0;
     }
     if (frame >= FRAME_SKIP_BASE - effectController.speed) {
       gpuCompute.compute();
       tmpHeightmap = gpuCompute.getCurrentRenderTarget(heightmapVariable).texture;
 
-      if (waterMesh.value) waterMesh.value.material.heightmap = tmpHeightmap;
+      if (waterMesh.value) {
+        waterMesh.value.material.heightmap = tmpHeightmap;
+      }
       frame = 0;
     }
 
@@ -281,19 +285,11 @@ useWindowResize(handleResize);
     @pointer-move="onPointerMove"
     @pointer-up="onPointerUp"
   >
-    <TresPlaneGeometry :args="[BOUNDS, BOUNDS, TEXTURE_WIDTH - 1, TEXTURE_WIDTH - 1]" />
-<!--    <TresWaterMaterial :args="[{-->
-<!--          color: WATER_COLOR,-->
-<!--          metalness: WATER_METALNESS,-->
-<!--          roughness: WATER_ROUGHNESS,-->
-<!--          transparent: false,-->
-<!--          opacity: WATER_OPACITY,-->
-<!--          side: THREE.DoubleSide-->
-<!--        }, TEXTURE_WIDTH, BOUNDS]"/>-->
+    <TresPlaneGeometry :args="[BOUNDS, BOUNDS, TEXTURE_WIDTH - 1, TEXTURE_WIDTH - 1]"/>
   </TresMesh>
   <TresMesh ref="meshRay" matrix-auto-update :rotation-x="PLANE_ROTATION_X">
-    <TresPlaneGeometry :args="[BOUNDS, BOUNDS, RAYCAST_PLANE_SEGMENTS, RAYCAST_PLANE_SEGMENTS]" />
-    <TresMeshBasicMaterial :color="INVISIBLE_MATERIAL_COLOR" :visible="false" />
+    <TresPlaneGeometry :args="[BOUNDS, BOUNDS, RAYCAST_PLANE_SEGMENTS, RAYCAST_PLANE_SEGMENTS]"/>
+    <TresMeshBasicMaterial :color="INVISIBLE_MATERIAL_COLOR" :visible="false"/>
   </TresMesh>
 </template>
 
