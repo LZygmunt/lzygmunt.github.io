@@ -3,7 +3,15 @@ import string from "vite-plugin-string";
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-05-15",
-  modules: ["@nuxt/eslint", "@tresjs/nuxt", "@nuxt/devtools"],
+  modules: [
+    "@nuxt/eslint",
+    "@tresjs/nuxt",
+    "@nuxt/devtools",
+    "@nuxtjs/tailwindcss",
+    "@pinia/nuxt",
+    "pinia-plugin-persistedstate/nuxt",
+  ],
+  css: ["~/assets/css/main.css"],
   devtools: {
     enabled: true,
     timeline: {
@@ -28,5 +36,13 @@ export default defineNuxtConfig({
   },
   components: {
     dirs: [],
+  },
+  postcss: {
+    plugins: {
+      "@tailwindcss/postcss": {},
+    },
+  },
+  tailwindcss: {
+    exposeConfig: { level: 4 },
   },
 });

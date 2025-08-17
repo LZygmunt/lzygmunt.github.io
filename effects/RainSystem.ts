@@ -1,6 +1,7 @@
 import type * as THREE from "three";
 
 import DropManager, { type DropUniforms, MAX_DROPS } from "~/effects/DropManager";
+import type { ValueOf } from "~/types/valueOf";
 import { getRandomArbitrary } from "~/utils/getRandomArbitrary";
 import { lerp } from "~/utils/lerp";
 
@@ -24,7 +25,8 @@ class RainSystem {
       boundsOrManager instanceof DropManager ? boundsOrManager : new DropManager(boundsOrManager);
 
     this.rain = this.rain.bind(this);
-    this.spawnDropsWithDelay = this.spawnDropsWithDelay.bind(this);
+    this.spawnDropsOneByOne = this.spawnDropsOneByOne.bind(this);
+    this.spawnDropsAllAtOnce = this.spawnDropsAllAtOnce.bind(this);
     this.resetDrops = this.resetDrops.bind(this);
     this.setMaxDrops = this.setMaxDrops.bind(this);
     this.setUniforms = this.setUniforms.bind(this);
@@ -77,14 +79,14 @@ class RainSystem {
     this.maxDrops = maxDrops;
   }
 
-  spawnDropsWithoutDelay(count: number) {
+  spawnDropsAllAtOnce(count: number) {
     for (let i = 0; i < count; i++) {
       this.#dropManager.spawnDrop(this.#computeDropParameters());
       this.#dropManager.updateUniforms(this.uniforms);
     }
   }
 
-  spawnDropsWithDelay(count: number) {
+  spawnDropsOneByOne(count: number) {
     const spawnOne = (remaining: number) => {
       if (remaining <= 0) return;
 
@@ -99,12 +101,12 @@ class RainSystem {
     spawnOne(count);
   }
 
-  rain(intensity: number, delayed = true) {
-    if (delayed) {
-      this.spawnDropsWithDelay(this.#computeRandomCount(intensity));
+  rain(intensity: number, mode: RainMode = RAIN_MODE.ONE_BY_ONE) {
+    if (isAllAtOnce(mode)) {
+      this.spawnDropsAllAtOnce(this.#computeRandomCount(intensity));
       return;
     }
-    this.spawnDropsWithoutDelay(this.#computeRandomCount(intensity));
+    this.spawnDropsOneByOne(this.#computeRandomCount(intensity));
   }
 
   resetDrops() {
@@ -114,11 +116,29 @@ class RainSystem {
 
 export const MIN_DROPS = 5;
 export const MAX_INTENSITY = 15;
+export const MIN_INTENSITY = 0;
+export const STEP_INTENSITY = 1;
 export const MAX_DROP_SIZE = 0.25;
 export const MIN_DROP_SIZE = 0.05;
+export const STEP_DROP_SIZE = 0.01;
 export const DROP_SIZE_FACTOR = 10;
 export const MAX_DROP_DEPTH = 0.04;
 export const MIN_DROP_DEPTH = 0.02;
+export const STEP_DROP_DEPTH = 0.001;
 export const BASE_DROP_DEPTH = MIN_DROP_DEPTH;
+
+export const RAIN_MODE = {
+  ONE_BY_ONE: "one_by_one",
+  ALL_AT_ONCE: "all_at_once",
+} as const;
+
+export type RainMode = ValueOf<typeof RAIN_MODE>;
+
+export function isOnByOne(mode: RainMode) {
+  return mode === RAIN_MODE.ONE_BY_ONE;
+}
+export function isAllAtOnce(mode: RainMode) {
+  return mode === RAIN_MODE.ALL_AT_ONCE;
+}
 
 export default RainSystem;

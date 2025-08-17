@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { type Intersection, useLoop, useTresContext } from "@tresjs/core";
 import * as THREE from "three";
-import { GUI } from "three/addons/libs/lil-gui.module.min";
 import { RGBELoader } from "three/addons/loaders/RGBELoader";
 import type { Variable } from "three/addons/misc/GPUComputationRenderer";
 import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer";
 
 import readWaterLevelFragmentShader from "~/assets/shaders/readWaterLevelFragmentShader.glsl";
 import shaderChangeHeightmapFrag from "~/assets/shaders/shaderChangeHeightmapFrag.glsl";
-import { DEFAULT_DROP_DEPTH, DEFAULT_DROP_SIZE } from "~/effects/Drop";
+import { useWindowResize } from "~/composables/useWindowResize";
+import { MAX_EFFECT_SPEED } from "~/constants";
 import DropManager, { MAX_DROPS } from "~/effects/DropManager";
 import RainSystem from "~/effects/RainSystem";
 import { WaterMaterial } from "~/materials/WaterMaterial";
-import { useWindowResize } from "~/useWindowResize";
+import { useControlsGUIStore } from "~/stores/useControlsGUIStore";
 
 // ========== CONFIGURATION CONSTANTS ==========
 // Simulation
@@ -25,8 +25,8 @@ const MOUSE_COORDS_NORMALIZE_MIN = -1; // Mouse coordinate normalization (minimu
 const MOUSE_COORDS_NORMALIZE_MAX = 1; // Mouse coordinate normalization (maximum)
 
 // Rendering and performance
-const FRAME_SKIP_BASE = 7; // Base number of frames to skip
-const DEFAULT_EFFECT_SPEED = 6; // Default effect speed
+const RAIN_FRAME_SKIP_BASE = 90;
+const FRAME_SKIP_BASE = MAX_EFFECT_SPEED; // Base number of frames to skip
 
 // Colors and materials
 const BACKGROUND_COLOR = 0x000000; // Scene background color
@@ -95,14 +95,12 @@ let gpuCompute: GPUComputationRenderer;
 let heightmapVariable: Variable;
 let readWaterLevelShader: THREE.ShaderMaterial;
 let frame = 0;
-let mousedown = false;
-const effectController = reactive({
-  speed: DEFAULT_EFFECT_SPEED,
-  size: DEFAULT_DROP_SIZE,
-  depth: DEFAULT_DROP_DEPTH,
-  rainIntensity: 0,
-  delayedVersion: true,
-});
+let rainFrames = 0;
+
+const controlsGUIStore = useControlsGUIStore();
+const { showCursorDrop, isCursorDrop, hideCursorDrop } = useCursorDrop(
+  () => controlsGUIStore.controls.cursorDropEnabled,
+);
 
 // Move environment loading to async function
 let env: THREE.DataTexture | null = null;
@@ -125,15 +123,6 @@ async function loadEnvironment() {
       scene.value.background = new THREE.Color(BACKGROUND_COLOR);
     }
   }
-}
-
-function initGui() {
-  const gui = new GUI();
-  gui.domElement.style.right = "20px";
-  gui.domElement.style.top = "20px";
-
-  gui.add(effectController, "rainIntensity", 0, 15, 1);
-  gui.add(effectController, "delayedVersion");
 }
 
 function init() {
@@ -168,11 +157,11 @@ function init() {
 }
 
 function onPointerDown() {
-  mousedown = true;
+  showCursorDrop();
 }
 
 function onPointerUp() {
-  mousedown = false;
+  hideCursorDrop();
 }
 
 function onPointerMove(event: PointerEvent & Intersection) {
@@ -189,7 +178,7 @@ function onPointerMove(event: PointerEvent & Intersection) {
 }
 
 function raycast() {
-  if (mousedown) {
+  if (isCursorDrop.value) {
     const uniforms = heightmapVariable.material.uniforms;
     raycaster.value.setFromCamera(mouseCoords, camera.value!);
     const intersects = raycaster.value.intersectObject(meshRay.value);
@@ -199,8 +188,8 @@ function raycast() {
       dropManager.value.updateDropOn(0, {
         x: point.x,
         y: point.z,
-        size: effectController.size,
-        depth: effectController.depth,
+        size: controlsGUIStore.controls.cursorDropSize,
+        depth: controlsGUIStore.controls.cursorDropDepth,
       });
 
       dropManager.value.updateUniforms(uniforms);
@@ -240,23 +229,24 @@ function handleResize() {
 }
 
 onMounted(async () => {
-  initGui();
-
   init();
 
   // Load environment asynchronously
   await loadEnvironment();
-  let tempRainFrames = 0;
+
   render(({ renderer, scene, camera }) => {
     raycast();
     frame++;
-    tempRainFrames++;
+    rainFrames++;
 
-    if (tempRainFrames > 90 / effectController.rainIntensity) {
-      rainSystem.value?.rain(effectController.rainIntensity, effectController.delayedVersion);
-      tempRainFrames = 0;
+    if (rainFrames > RAIN_FRAME_SKIP_BASE / controlsGUIStore.controls.rainIntensity) {
+      rainSystem.value?.rain(
+        controlsGUIStore.controls.rainIntensity,
+        controlsGUIStore.controls.rainMode,
+      );
+      rainFrames = 0;
     }
-    if (frame >= FRAME_SKIP_BASE - effectController.speed) {
+    if (frame >= FRAME_SKIP_BASE - controlsGUIStore.controls.speed) {
       gpuCompute.compute();
       tmpHeightmap = gpuCompute.getCurrentRenderTarget(heightmapVariable).texture;
 
@@ -271,6 +261,27 @@ onMounted(async () => {
 });
 
 useWindowResize(handleResize);
+function useCursorDrop(enabled: MaybeRefOrGetter<boolean>) {
+  const isCursorDrop = ref(false);
+  const isEnabled = computed(() => toValue(enabled));
+
+  function showCursorDrop() {
+    if (isEnabled.value) {
+      isCursorDrop.value = true;
+    }
+  }
+  function hideCursorDrop() {
+    if (isEnabled.value) {
+      isCursorDrop.value = false;
+    }
+  }
+
+  return {
+    isCursorDrop: readonly(isCursorDrop),
+    showCursorDrop,
+    hideCursorDrop,
+  };
+}
 </script>
 
 <template>
