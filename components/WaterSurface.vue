@@ -27,6 +27,8 @@ const MOUSE_COORDS_NORMALIZE_MAX = 1; // Mouse coordinate normalization (maximum
 // Rendering and performance
 const RAIN_FRAME_SKIP_BASE = 90;
 const FRAME_SKIP_BASE = MAX_EFFECT_SPEED; // Base number of frames to skip
+const FRAME_RATE_LIMIT = 60;
+const FRAME_DELAY = 1 / FRAME_RATE_LIMIT; // elapsed jest w sekundach
 
 // Colors and materials
 const BACKGROUND_COLOR = 0x000000; // Scene background color
@@ -96,6 +98,7 @@ let heightmapVariable: Variable;
 let readWaterLevelShader: THREE.ShaderMaterial;
 let frame = 0;
 let rainFrames = 0;
+let lastFrameTime = 0;
 
 const controlsGUIStore = useControlsGUIStore();
 const { showCursorDrop, isCursorDrop, hideCursorDrop } = useCursorDrop(
@@ -234,7 +237,13 @@ onMounted(async () => {
   // Load environment asynchronously
   await loadEnvironment();
 
-  render(({ renderer, scene, camera }) => {
+  render(({ renderer, scene, camera, elapsed }) => {
+    if (elapsed - lastFrameTime < FRAME_DELAY) {
+      return;
+    }
+
+    lastFrameTime = elapsed;
+
     raycast();
     frame++;
     rainFrames++;
